@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HORMUZ PULSE // GLOBAL CONFLICT MONITOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@200;300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg-primary: #050a0e;
+    --bg-secondary: #080f14;
+    --bg-panel: #0a1520;
+    --bg-card: #0d1c28;
+    --border: #1a3348;
+    --border-bright: #1e4060;
+    --accent: #00c8ff;
+    --accent2: #ff4444;
+    --accent3: #ffaa00;
+    --accent4: #00ff88;
+    --text-primary: #c8e8f8;
+    --text-secondary: #6a9bbf;
+    --text-dim: #3a6070;
+    --text-mono: #8dc8e8;
+    --threat-low: #00ff88;
+    --threat-med: #ffaa00;
+    --threat-high: #ff4444;
+    --radar-green: #00ff88;
+    --grid-line: rgba(0, 200, 255, 0.06);
+  }
+  [data-theme="light"] {
+    --bg-primary: #e8edf2;
+    --bg-secondary: #dde4ec;
+    --bg-panel: #d0dae6;
+    --bg-card: #c8d4e0;
+    --border: #a0b8cc;
+    --border-bright: #7090aa;
+    --accent: #006090;
+    --accent2: #cc2200;
+    --accent3: #aa6600;
+    --accent4: #006040;
+    --text-primary: #0a2030;
+    --text-secondary: #305070;
+    --text-dim: #6080a0;
+    --text-mono: #1a4060;
+    --threat-low: #006040;
+    --threat-med: #aa6600;
+    --threat-high: #cc2200;
+    --radar-green: #006040;
+    --grid-line: rgba(0, 80, 160, 0.08);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+  }
+  .mono { font-family: 'Share Tech Mono', monospace; }
+  .raj { font-family: 'Rajdhani', sans-serif; }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none; z-index: 9999;
+    animation: scanMove 8s linear infinite;
+  }
+  @keyframes scanMove { from { transform: translateY(0); } to { transform: translateY(4px); } }
+
+  /* ── GRID PATTERN ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── LAYOUT ── */
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; z-index: 1; }
+
+  /* ── TOP HEADER ── */
+  #header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0 12px;
+    height: 44px;
+    display: flex; align-items: center; gap: 0;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  #header::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: headerGlow 3s ease-in-out infinite;
+  }
+  @keyframes headerGlow { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+  .logo-block { display: flex; align-items: center; gap: 8px; padding-right: 16px; border-right: 1px solid var(--border); }
+  .logo-symbol {
+    width: 28px; height: 28px;
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    animation: logoPulse 2s ease-in-out infinite;
+  }
+  .logo-symbol::before {
+    content: '';
+    position: absolute; inset: 3px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+  .logo-symbol::after {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  @keyframes logoPulse { 0%,100% { box-shadow: 0 0 6px var(--accent); } 50% { box-shadow: 0 0 16px var(--accent), 0 0 30px rgba(0,200,255,0.2); } }
+
+  .logo-text .title { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 3px; line-height: 1; }
+  .logo-text .subtitle { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-secondary); letter-spacing: 2px; }
+
+  .header-stats { display: flex; flex: 1; gap: 0; padding: 0 8px; }
+  .hstat {
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 14px;
+    border-right: 1px solid var(--border);
+    min-width: 80px;
+  }
+  .hstat-label { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; }
+  .hstat-val { font-family: 'Share Tech Mono', monospace; font-size: 16px; font-weight: 400; color: var(--text-primary); line-height: 1.2; }
+  .hstat-val.red { color: var(--accent2); text-shadow: 0 0 8px rgba(255,68,68,0.4); }
+  .hstat-val.amber { color: var(--accent3); }
+  .hstat-val.green { color: var(--accent4); }
+  .hstat-val.cyan { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 8px; padding-left: 12px; }
+  .status-pill {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    padding: 3px 8px; border-radius: 2px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .status-pill.live { background: rgba(255,68,68,0.15); border: 1px solid rgba(255,68,68,0.4); color: var(--accent2); }
+  .status-pill.live::before { content: ''; width: 5px; height: 5px; background: var(--accent2); border-radius: 50%; animation: blink 1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+  #theme-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  #theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  #clock { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: var(--accent); min-width: 80px; text-align: right; }
+
+  /* ── STATS BAR ── */
+  #statsbar {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 4px 12px;
+    display: flex; align-items: center; gap: 8px;
+    height: 32px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .ticker-label { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 2px; color: var(--accent2); padding: 1px 6px; background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.3); margin-right: 4px; flex-shrink: 0; }
+  .ticker-wrap { flex: 1; overflow: hidden; position: relative; }
+  .ticker-track { display: flex; gap: 40px; white-space: nowrap; animation: tickerScroll 60s linear infinite; }
+  .ticker-item { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-mono); }
+  .ticker-item span { color: var(--accent3); }
+  @keyframes tickerScroll { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+
+  .threat-bar-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-left: 8px; border-left: 1px solid var(--border); }
+  .threat-bar-label { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); letter-spacing: 1px; }
+  .threat-level-bar { display: flex; gap: 2px; }
+  .tlb-seg { width: 14px; height: 12px; background: var(--border); transition: background 0.3s; }
+  .tlb-seg.active-low { background: var(--threat-low); box-shadow: 0 0 4px var(--threat-low); }
+  .tlb-seg.active-med { background: var(--threat-med); box-shadow: 0 0 4px var(--threat-med); }
+  .tlb-seg.active-high { background: var(--threat-high); box-shadow: 0 0 4px var(--threat-high); animation: segFlash 0.5s ease-in-out infinite; }
+  @keyframes segFlash { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+  .threat-text { font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1px; }
+
+  /* ── MAIN AREA ── */
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── LEFT SIDEBAR ── */
+  #sidebar-left {
+    width: 200px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .panel-title { font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; }
+  .panel-badge { font-family: 'Share Tech Mono', monospace; font-size: 9px; padding: 1px 5px; background: rgba(0,200,255,0.1); border: 1px solid rgba(0,200,255,0.3); color: var(--accent); border-radius: 1px; }
+
+  .region-list { flex: 1; overflow-y: auto; padding: 4px; }
+  .region-list::-webkit-scrollbar { width: 3px; }
+  .region-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .region-item {
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .region-item:hover { background: rgba(0,200,255,0.05); border-color: var(--border); }
+  .region-item.active { background: rgba(0,200,255,0.08); border-color: rgba(0,200,255,0.3); }
+  .region-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .region-info { flex: 1; }
+  .region-name { font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.5px; }
+  .region-count { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-secondary); }
+  .region-score { font-family: 'Share Tech Mono', monospace; font-size: 11px; margin-left: auto; }
+
+  /* Radar widget */
+  #radar-container {
+    padding: 8px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .radar-label { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 4px; text-align: center; }
+  #radar-canvas { display: block; margin: 0 auto; }
+
+  /* Category legend */
+  #cat-legend {
+    padding: 6px 8px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .cat-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .cat-icon { width: 10px; height: 10px; border-radius: 1px; flex-shrink: 0; }
+  .cat-name { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-secondary); flex: 1; }
+  .cat-num { font-family: 'Share Tech Mono', monospace; font-size: 10px; }
+
+  /* ── MAP CENTER ── */
+  #map-container { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  #map { flex: 1; }
+  .leaflet-container { background: #050a0e !important; }
+
+  /* Map overlays */
+  .map-overlay-tl, .map-overlay-tr, .map-overlay-bl, .map-overlay-br {
+    position: absolute; z-index: 1000; pointer-events: none;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .map-overlay-tl { top: 8px; left: 8px; }
+  .map-overlay-tr { top: 8px; right: 8px; }
+  .map-overlay-bl { bottom: 50px; left: 8px; }
+  .map-overlay-br { bottom: 50px; right: 8px; }
+
+  .map-coord-box {
+    background: rgba(5,10,14,0.85);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    font-size: 9px;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    backdrop-filter: blur(4px);
+  }
+  .map-info-box {
+    background: rgba(5,10,14,0.9);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    min-width: 140px;
+  }
+  .map-info-row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 2px; }
+  .map-info-key { font-size: 8px; color: var(--text-dim); letter-spacing: 1px; }
+  .map-info-val { font-size: 10px; color: var(--text-mono); }
+
+  /* Timeline */
+  #timeline {
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    padding: 5px 12px;
+    display: flex; align-items: center; gap: 10px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+  .tl-label { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); letter-spacing: 1.5px; white-space: nowrap; }
+  #timeline-slider { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  .tl-marks { display: flex; justify-content: space-between; font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); min-width: 0; flex: 2; }
+
+  /* ── RIGHT SIDEBAR ── */
+  #sidebar-right {
+    width: 300px;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  /* Feed */
+  #feed { flex: 1; overflow-y: auto; padding: 4px; }
+  #feed::-webkit-scrollbar { width: 3px; }
+  #feed::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .feed-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 8px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex; gap: 8px;
+    animation: feedIn 0.3s ease-out;
+  }
+  @keyframes feedIn { from { opacity:0; transform: translateX(8px); } to { opacity:1; transform: translateX(0); } }
+  .feed-item:hover { border-color: var(--border-bright); background: var(--bg-panel); }
+  .feed-item.new { border-color: rgba(0,200,255,0.5); animation: feedIn 0.3s ease-out, newPulse 1s ease-out; }
+  @keyframes newPulse { 0%{box-shadow:0 0 0 2px rgba(0,200,255,0.3);} 100%{box-shadow:none;} }
+
+  .feed-thumb {
+    width: 48px; height: 48px;
+    object-fit: cover; border-radius: 1px;
+    flex-shrink: 0;
+    filter: saturate(0.7) brightness(0.8);
+  }
+  .feed-content { flex: 1; min-width: 0; }
+  .feed-meta { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
+  .feed-type-badge {
+    font-family: 'Share Tech Mono', monospace; font-size: 8px; padding: 1px 4px;
+    border-radius: 1px; letter-spacing: 0.5px; flex-shrink: 0;
+  }
+  .type-explosion { background: rgba(255,68,68,0.2); border: 1px solid rgba(255,68,68,0.4); color: var(--accent2); }
+  .type-clash { background: rgba(255,170,0,0.2); border: 1px solid rgba(255,170,0,0.4); color: var(--accent3); }
+  .type-tension { background: rgba(0,200,255,0.15); border: 1px solid rgba(0,200,255,0.3); color: var(--accent); }
+
+  .feed-score { font-family: 'Share Tech Mono', monospace; font-size: 10px; margin-left: auto; }
+  .feed-title { font-family: 'Exo 2', sans-serif; font-size: 11px; font-weight: 400; color: var(--text-primary); line-height: 1.35; margin-bottom: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .feed-footer { display: flex; align-items: center; gap: 6px; }
+  .feed-source { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-dim); }
+  .feed-time { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-secondary); margin-left: auto; }
+
+  /* Analysis panel below feed */
+  #analysis-panel {
+    border-top: 1px solid var(--border);
+    padding: 6px 8px;
+    flex-shrink: 0;
+    background: var(--bg-panel);
+  }
+  .mini-chart-label { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-dim); letter-spacing: 1.5px; margin-bottom: 4px; }
+  #bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 40px; }
+  .bar-seg { flex: 1; border-radius: 1px 1px 0 0; min-height: 4px; transition: height 0.5s ease; position: relative; cursor: default; }
+  .bar-seg:hover::after { content: attr(data-val); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--text-primary); white-space: nowrap; background: var(--bg-card); padding: 2px 4px; border: 1px solid var(--border); }
+
+  /* Leaflet custom styles */
+  .leaflet-tile-pane { filter: brightness(0.9) saturate(0.8); }
+  [data-theme="light"] .leaflet-tile-pane { filter: brightness(1) saturate(1); }
+  .custom-marker { position: relative; }
+  .pulse-ring {
+    position: absolute; top: 50%; left: 50%;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+    animation: pulseRing 2s ease-out infinite;
+  }
+  @keyframes pulseRing { 0%{width:8px;height:8px;opacity:0.8;} 100%{width:32px;height:32px;opacity:0;} }
+  .leaflet-popup-content-wrapper {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-bright) !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 20px rgba(0,200,255,0.1) !important;
+    color: var(--text-primary) !important;
+  }
+  .leaflet-popup-tip { background: var(--bg-card) !important; }
+  .leaflet-popup-content { margin: 10px 12px !important; }
+  .popup-type { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 2px; color: var(--accent); margin-bottom: 4px; }
+  .popup-title { font-family: 'Exo 2', sans-serif; font-size: 12px; font-weight: 400; line-height: 1.4; margin-bottom: 6px; }
+  .popup-meta { display: flex; gap: 12px; }
+  .popup-meta-item { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-secondary); }
+  .popup-meta-item span { color: var(--text-primary); }
+  .loading-screen {
+    position: fixed; inset: 0; background: var(--bg-primary);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 99999; gap: 12px;
+  }
+  .loading-logo { font-family: 'Rajdhani', sans-serif; font-size: 32px; font-weight: 700; color: var(--accent); letter-spacing: 8px; }
+  .loading-sub { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-secondary); letter-spacing: 3px; }
+  .loading-bar-wrap { width: 300px; height: 2px; background: var(--border); overflow: hidden; }
+  .loading-bar-inner { height: 100%; background: var(--accent); animation: loadBar 2.5s ease-in-out forwards; }
+  @keyframes loadBar { 0%{width:0;} 60%{width:75%;} 100%{width:100%;} }
+  .loading-steps { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-dim); letter-spacing: 1px; text-align: center; }
+  #loading-step-text { color: var(--accent4); }
+
+  /* Spinners */
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Modal */
+  #event-modal {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.7);
+    align-items: center; justify-content: center;
+  }
+  #event-modal.open { display: flex; }
+  .modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 2px;
+    max-width: 480px; width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 0 40px rgba(0,200,255,0.1);
+    animation: modalIn 0.2s ease-out;
+  }
+  @keyframes modalIn { from{opacity:0;transform:scale(0.95);} to{opacity:1;transform:scale(1);} }
+  .modal-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 2px; color: var(--accent); }
+  .modal-close { background: none; border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; padding: 4px 8px; font-family: 'Share Tech Mono', monospace; font-size: 10px; border-radius: 1px; }
+  .modal-close:hover { border-color: var(--accent2); color: var(--accent2); }
+  .modal-body { padding: 14px 16px; }
+  .modal-img { width: 100%; height: 160px; object-fit: cover; margin-bottom: 12px; border-radius: 1px; filter: saturate(0.8); }
+  .modal-field { margin-bottom: 10px; }
+  .modal-field-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 3px; }
+  .modal-field-val { font-family: 'Exo 2', sans-serif; font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+  .modal-threat-bar { display: flex; gap: 3px; margin-top: 4px; }
+  .modal-threat-seg { height: 8px; flex: 1; background: var(--border); border-radius: 1px; }
+
+  /* Responsive scroll */
+  @media (max-width: 1100px) {
+    #sidebar-left { width: 160px; }
+    #sidebar-right { width: 240px; }
+  }
+
+  /* Corners decoration */
+  .corner-dec {
+    position: absolute; width: 14px; height: 14px;
+    border-color: var(--accent); border-style: solid;
+    opacity: 0.6; pointer-events: none; z-index: 1001;
+  }
+  .corner-tl { top: 4px; left: 4px; border-width: 1px 0 0 1px; }
+  .corner-tr { top: 4px; right: 4px; border-width: 1px 1px 0 0; }
+  .corner-bl { bottom: 40px; left: 4px; border-width: 0 0 1px 1px; }
+  .corner-br { bottom: 40px; right: 4px; border-width: 0 1px 1px 0; }
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div class="loading-screen" id="loading-screen">
+  <div class="loading-logo">HORMUZ PULSE</div>
+  <div class="loading-sub">// GLOBAL CONFLICT MONITOR //</div>
+  <div style="height:16px;"></div>
+  <div class="loading-bar-wrap"><div class="loading-bar-inner"></div></div>
+  <div style="height:8px;"></div>
+  <div class="loading-steps">INIT SEQUENCE &nbsp; ► &nbsp; <span id="loading-step-text">LOADING SUBSYSTEMS...</span></div>
+</div>
+
+<!-- EVENT MODAL -->
+<div id="event-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-type-label">EVENT DETAIL</div>
+      <button class="modal-close" onclick="closeModal()">✕ CLOSE</button>
+    </div>
+    <div class="modal-body">
+      <img class="modal-img" id="modal-img" src="" alt="event">
+      <div class="modal-field">
+        <div class="modal-field-label">TITLE</div>
+        <div class="modal-field-val" id="modal-title-val"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="modal-field">
+          <div class="modal-field-label">REGION</div>
+          <div class="modal-field-val mono" id="modal-region-val" style="font-size:12px;"></div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-field-label">TIMESTAMP</div>
+          <div class="modal-field-val mono" id="modal-time-val" style="font-size:12px;"></div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-field-label">CATEGORY</div>
+          <div class="modal-field-val mono" id="modal-cat-val" style="font-size:12px;"></div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-field-label">THREAT SCORE</div>
+          <div class="modal-field-val mono" id="modal-score-val" style="font-size:12px;"></div>
+        </div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">THREAT LEVEL</div>
+        <div class="modal-threat-bar" id="modal-threat-bar"></div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">SOURCE</div>
+        <div class="modal-field-val mono" id="modal-source-val" style="font-size:11px;color:var(--text-secondary);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="logo-block">
+      <div class="logo-symbol"></div>
+      <div class="logo-text">
+        <div class="title">HORMUZ PULSE</div>
+        <div class="subtitle">// GLOBAL CONFLICT MONITOR</div>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="hstat">
+        <div class="hstat-label">EVENTS/24H</div>
+        <div class="hstat-val cyan" id="stat-events">—</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">EXPLOSIONS</div>
+        <div class="hstat-val red" id="stat-exp">—</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">CLASHES</div>
+        <div class="hstat-val amber" id="stat-clashes">—</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">TENSIONS</div>
+        <div class="hstat-val" id="stat-tensions">—</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">MAX THREAT</div>
+        <div class="hstat-val red" id="stat-max">—</div>
+      </div>
+      <div class="hstat" style="border-right:none;">
+        <div class="hstat-label">AVG SCORE</div>
+        <div class="hstat-val amber" id="stat-avg">—</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill live">LIVE</div>
+      <button id="theme-btn" onclick="toggleTheme()">☀ LIGHT</button>
+      <div id="clock">--:--:--</div>
+    </div>
+  </div>
+
+  <!-- STATS TICKER -->
+  <div id="statsbar">
+    <div class="ticker-label">INTEL</div>
+    <div class="ticker-wrap">
+      <div class="ticker-track" id="ticker-track">
+        <span class="ticker-item">LOADING INTELLIGENCE FEEDS...</span>
+        <span class="ticker-item">LOADING INTELLIGENCE FEEDS...</span>
+      </div>
+    </div>
+    <div class="threat-bar-wrap">
+      <div class="threat-bar-label">THREAT</div>
+      <div class="threat-level-bar" id="threat-bar">
+        <div class="tlb-seg" id="tb0"></div>
+        <div class="tlb-seg" id="tb1"></div>
+        <div class="tlb-seg" id="tb2"></div>
+        <div class="tlb-seg" id="tb3"></div>
+        <div class="tlb-seg" id="tb4"></div>
+        <div class="tlb-seg" id="tb5"></div>
+        <div class="tlb-seg" id="tb6"></div>
+        <div class="tlb-seg" id="tb7"></div>
+        <div class="tlb-seg" id="tb8"></div>
+        <div class="tlb-seg" id="tb9"></div>
+      </div>
+      <div class="threat-text" id="threat-label" style="color:var(--threat-med);">MODERATE</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- LEFT SIDEBAR -->
+    <div id="sidebar-left">
+      <div class="panel-header">
+        <div class="panel-title">REGIONS</div>
+        <div class="panel-badge" id="region-count-badge">0</div>
+      </div>
+      <div class="region-list" id="region-list"></div>
+
+      <div id="radar-container">
+        <div class="radar-label">ACTIVITY RADAR</div>
+        <canvas id="radar-canvas" width="160" height="100"></canvas>
+      </div>
+
+      <div id="cat-legend">
+        <div class="cat-row">
+          <div class="cat-icon" style="background:var(--accent2);"></div>
+          <div class="cat-name mono">EXPLOSION</div>
+          <div class="cat-num" style="color:var(--accent2);" id="leg-exp">0</div>
+        </div>
+        <div class="cat-row">
+          <div class="cat-icon" style="background:var(--accent3);"></div>
+          <div class="cat-name mono">CLASH</div>
+          <div class="cat-num" style="color:var(--accent3);" id="leg-clash">0</div>
+        </div>
+        <div class="cat-row">
+          <div class="cat-icon" style="background:var(--accent);"></div>
+          <div class="cat-name mono">TENSION</div>
+          <div class="cat-num" style="color:var(--accent);" id="leg-tension">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP -->
+    <div id="map-container">
+      <div class="corner-dec corner-tl"></div>
+      <div class="corner-dec corner-tr"></div>
+      <div class="corner-dec corner-bl"></div>
+      <div class="corner-dec corner-br"></div>
+
+      <div id="map"></div>
+
+      <div class="map-overlay-tl">
+        <div class="map-coord-box" id="map-coords">LAT: 26.9°N &nbsp;|&nbsp; LNG: 56.3°E</div>
+      </div>
+      <div class="map-overlay-tr">
+        <div class="map-coord-box">PROJ: WGS84 &nbsp;|&nbsp; MERCATOR &nbsp;|&nbsp; <span id="zoom-level">Z:4</span></div>
+      </div>
+      <div class="map-overlay-bl">
+        <div class="map-info-box" id="hover-info">
+          <div class="map-info-row"><div class="map-info-key">HOVER MARKER</div><div class="map-info-val">—</div></div>
+          <div class="map-info-row"><div class="map-info-key">FOR DETAILS</div><div class="map-info-val">CLICK EVENT</div></div>
+        </div>
+      </div>
+      <div class="map-overlay-br">
+        <div class="map-info-box">
+          <div class="map-info-row"><div class="map-info-key">DATA SRC</div><div class="map-info-val" id="data-source-label" style="color:var(--accent4);">GDELT</div></div>
+          <div class="map-info-row"><div class="map-info-key">REFRESH</div><div class="map-info-val">5MIN</div></div>
+          <div class="map-info-row"><div class="map-info-key">COVERAGE</div><div class="map-info-val">GLOBAL</div></div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div id="timeline">
+        <div class="tl-label">TIMELINE</div>
+        <div class="tl-marks">
+          <span>-24H</span><span>-18H</span><span>-12H</span><span>-6H</span><span>NOW</span>
+        </div>
+        <input type="range" id="timeline-slider" min="0" max="100" value="100">
+        <div class="tl-label" id="tl-time-label">NOW</div>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <div id="sidebar-right">
+      <div class="panel-header">
+        <div class="panel-title">INTEL FEED</div>
+        <div class="panel-badge" id="feed-count-badge">0</div>
+      </div>
+      <div id="feed"></div>
+
+      <div id="analysis-panel">
+        <div class="mini-chart-label">ACTIVITY / LAST 12 HOURS</div>
+        <div id="bar-chart"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:2px;">
+          <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text-dim);">-12H</span>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text-dim);">NOW</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── UNSPLASH IMAGE FALLBACKS BY TYPE ──
+const FALLBACK_IMGS = {
+  explosion: [
+    'https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=120&q=60',
+    'https://images.unsplash.com/photo-1614680376408-81e91ffe3db7?w=120&q=60',
+    'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=120&q=60',
+  ],
+  clash: [
+    'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=120&q=60',
+    'https://images.unsplash.com/photo-1464037866556-6812c9d1c72e?w=120&q=60',
+    'https://images.unsplash.com/photo-1553697388-94e804e2f0f6?w=120&q=60',
+  ],
+  tension: [
+    'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=120&q=60',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=120&q=60',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&q=60',
+  ]
+};
+const FALLBACK_MODAL = {
+  explosion: 'https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=480&q=70',
+  clash: 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=480&q=70',
+  tension: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=480&q=70'
+};
+
+function getFallback(type) {
+  const arr = FALLBACK_IMGS[type] || FALLBACK_IMGS.tension;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function imgError(el, type) {
+  el.src = getFallback(type);
+  el.onerror = null;
+}
+
+// ── MOCK DATA GENERATOR ──
+const MOCK_REGIONS = [
+  {name:'Strait of Hormuz', lat:26.56, lng:56.25},
+  {name:'Gulf of Aden', lat:12.5, lng:46.5},
+  {name:'Red Sea', lat:20.0, lng:38.5},
+  {name:'Black Sea', lat:43.0, lng:34.0},
+  {name:'Persian Gulf', lat:27.0, lng:50.5},
+  {name:'Eastern Ukraine', lat:48.4, lng:38.2},
+  {name:'Gaza Strip', lat:31.3, lng:34.4},
+  {name:'Yemen Coast', lat:15.6, lng:42.9},
+  {name:'Caspian Sea', lat:41.8, lng:51.0},
+  {name:'Lebanon Border', lat:33.1, lng:35.5},
+];
+const MOCK_TITLES = [
+  'Drone strike reported near tanker convoy in Gulf waters',
+  'Naval exchange fire observed in contested maritime zone',
+  'Missile alert issued for shipping vessels near Hormuz',
+  'Ground forces clash along fortified border positions',
+  'Infrastructure explosion disrupts supply chain corridor',
+  'Anti-ship missile launch detected by satellite imagery',
+  'Escalating tensions as naval vessels shadow disputed fleet',
+  'Explosion destroys fuel depot near conflict boundary',
+  'Warships exchange fire during transit of contested strait',
+  'Military buildup observed along demarcation line',
+  'Rocket attack targets military installation near coast',
+  'Unmanned vessels intercept commercial shipping route',
+  'Artillery barrage heard near disputed oil terminal',
+  'Diplomatic talks collapse as border incidents escalate',
+  'Submarine activity detected in sensitive maritime corridor',
+  'Armed groups attack infrastructure in contested region',
+  'Conflict-related fire destroys energy distribution node',
+  'Ceasefire violations reported in monitored buffer zone',
+  'Aerial bombardment reported near civilian infrastructure',
+  'Patrol vessels detained during routine maritime transit',
+];
+const SOURCES = ['Reuters','AP Wire','BBC Monitor','Al Jazeera','OSINT-NET','NavyTimes','StrategyPage','Bellingcat','War Zone','ACLED'];
+
+function makeMockEvents(n=15) {
+  const events = [];
+  const types = ['explosion','explosion','clash','clash','clash','tension','tension','tension','tension','tension'];
+  for(let i=0;i<n;i++){
+    const region = MOCK_REGIONS[Math.floor(Math.random()*MOCK_REGIONS.length)];
+    const type = types[Math.floor(Math.random()*types.length)];
+    const score = type==='explosion' ? 65+Math.floor(Math.random()*35) :
+                  type==='clash'     ? 40+Math.floor(Math.random()*35) :
+                                       10+Math.floor(Math.random()*30);
+    const jitter = () => (Math.random()-0.5)*3;
+    const hoursAgo = Math.floor(Math.random()*24);
+    const dt = new Date(Date.now() - hoursAgo*3600000);
+    events.push({
+      title: MOCK_TITLES[Math.floor(Math.random()*MOCK_TITLES.length)],
+      type, score,
+      lat: region.lat + jitter(),
+      lng: region.lng + jitter(),
+      region: region.name,
+      source: SOURCES[Math.floor(Math.random()*SOURCES.length)],
+      timestamp: dt,
+      img: null,
+    });
+  }
+  return events;
+}
+
+// ── GDELT PARSER ──
+function classifyEvent(title) {
+  const t = title.toLowerCase();
+  const explodeKw = ['explosion','blast','strike','attack','bomb','missile','rocket','fire','hit','destroy','detonate','drone'];
+  const clashKw   = ['clash','fight','battle','combat','exchange','fire','shoot','killed','wounded','troops','forces','war','military'];
+  const tensionKw = ['tension','threat','warn','alarm','escalat','conflict','crisis','dispute','sanction','naval','vessel'];
+  let score = 20;
+  let type = 'tension';
+  for(const kw of explodeKw) if(t.includes(kw)){ type='explosion'; score=Math.min(100,score+30); }
+  if(type!=='explosion') for(const kw of clashKw) if(t.includes(kw)){ type='clash'; score=Math.min(100,score+20); }
+  for(const kw of tensionKw) if(t.includes(kw)) score=Math.min(100,score+5);
+  if(type==='explosion') score=Math.max(60,score);
+  else if(type==='clash') score=Math.max(40,score);
+  else score=Math.max(10,Math.min(45,score));
+  return {type,score};
+}
+
+async function fetchGDELT() {
+  const url = 'https://api.gdeltproject.org/api/v2/events/doc/doc?query=Hormuz%20OR%20Gulf%20Ukraine%20Red%20Sea%20attack%20explosion&format=json&maxrecords=25&sort=DateDesc';
+  const resp = await fetch(url, {signal: AbortSignal.timeout(8000)});
+  if(!resp.ok) throw new Error('GDELT HTTP '+resp.status);
+  const data = await resp.json();
+  if(!data.articles || !data.articles.length) throw new Error('No articles');
+  const regionMap = {
+    'hormuz':   {lat:26.56,lng:56.25,name:'Strait of Hormuz'},
+    'gulf':     {lat:27.0, lng:50.5, name:'Persian Gulf'},
+    'red sea':  {lat:20.0, lng:38.5, name:'Red Sea'},
+    'ukraine':  {lat:49.0, lng:32.0, name:'Ukraine'},
+    'yemen':    {lat:15.6, lng:42.9, name:'Yemen'},
+    'iran':     {lat:35.0, lng:51.0, name:'Iran'},
+    'iraq':     {lat:33.0, lng:44.0, name:'Iraq'},
+    'syria':    {lat:34.8, lng:38.0, name:'Syria'},
+    'israel':   {lat:31.5, lng:34.8, name:'Israel'},
+    'gaza':     {lat:31.3, lng:34.4, name:'Gaza'},
+    'lebanon':  {lat:33.8, lng:35.5, name:'Lebanon'},
+    'houthi':   {lat:15.0, lng:44.0, name:'Yemen (Houthi)'},
+    'aden':     {lat:12.8, lng:45.0, name:'Gulf of Aden'},
+  };
+  return data.articles.map(a => {
+    const {type,score} = classifyEvent(a.title||'');
+    let location = {lat:26.56,lng:56.25,name:'Middle East'};
+    const lc = (a.title||'').toLowerCase();
+    for(const [kw,loc] of Object.entries(regionMap)){
+      if(lc.includes(kw)){ location=loc; break; }
+    }
+    const jit = ()=>(Math.random()-0.5)*2;
+    const hoursAgo = Math.floor(Math.random()*12);
+    return {
+      title: a.title||'Event detected',
+      type, score,
+      lat: (a.geocode?.lat ?? location.lat)+jit(),
+      lng: (a.geocode?.lon ?? location.lng)+jit(),
+      region: a.domain||location.name,
+      source: a.domain||'GDELT',
+      timestamp: new Date(Date.now()-hoursAgo*3600000),
+      img: a.socialimage||null,
+    };
+  });
+}
+
+// ── MAP ──
+let map, markersLayer=[];
+let allEvents = [];
+let currentModal = null;
+
+function initMap(){
+  map = L.map('map', {
+    center:[28,45], zoom:4,
+    zoomControl:false, attributionControl:false
+  });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; CartoDB', subdomains:'abcd', maxZoom:19
+  }).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  map.on('mousemove', e=>{
+    document.getElementById('map-coords').textContent =
+      `LAT: ${e.latlng.lat.toFixed(2)}°${e.latlng.lat>=0?'N':'S'}   |   LNG: ${e.latlng.lng.toFixed(2)}°${e.latlng.lng>=0?'E':'W'}`;
+    document.getElementById('zoom-level').textContent = 'Z:'+map.getZoom();
+  });
+}
+
+function getMarkerColor(type){
+  if(type==='explosion') return '#ff4444';
+  if(type==='clash')     return '#ffaa00';
+  return '#00c8ff';
+}
+
+function plotEvents(events){
+  markersLayer.forEach(m=>map.removeLayer(m));
+  markersLayer=[];
+  events.forEach((ev,i)=>{
+    const color = getMarkerColor(ev.type);
+    const size = 6 + Math.floor(ev.score/20);
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="position:relative;width:${size*2}px;height:${size*2}px;">
+        <div class="pulse-ring" style="border:2px solid ${color};"></div>
+        <div style="position:absolute;top:50%;left:50%;width:${size}px;height:${size}px;transform:translate(-50%,-50%);background:${color};border-radius:50%;opacity:0.9;box-shadow:0 0 8px ${color};"></div>
+      </div>`,
+      iconSize:[size*2, size*2],
+      iconAnchor:[size, size],
+    });
+    const marker = L.marker([ev.lat, ev.lng], {icon})
+      .bindPopup(makePopup(ev), {maxWidth:280})
+      .addTo(map);
+    marker.on('click', ()=>openModal(ev));
+    markersLayer.push(marker);
+  });
+}
+
+function makePopup(ev){
+  return `<div style="background:var(--bg-card);color:var(--text-primary);">
+    <div class="popup-type">${ev.type.toUpperCase()} — SCORE ${ev.score}</div>
+    <div class="popup-title">${ev.title.substring(0,80)}${ev.title.length>80?'...':''}</div>
+    <div class="popup-meta">
+      <div class="popup-meta-item">REG: <span>${ev.region}</span></div>
+      <div class="popup-meta-item">SRC: <span>${ev.source}</span></div>
+    </div>
+  </div>`;
+}
+
+// ── MODAL ──
+function openModal(ev){
+  currentModal = ev;
+  document.getElementById('modal-type-label').textContent = ev.type.toUpperCase()+' // EVENT DETAIL';
+  const img = document.getElementById('modal-img');
+  img.src = ev.img || FALLBACK_MODAL[ev.type];
+  img.onerror = ()=>{ img.src=FALLBACK_MODAL[ev.type]; img.onerror=null; };
+  document.getElementById('modal-title-val').textContent = ev.title;
+  document.getElementById('modal-region-val').textContent = ev.region;
+  document.getElementById('modal-time-val').textContent = formatTime(ev.timestamp);
+  document.getElementById('modal-cat-val').textContent = ev.type.toUpperCase();
+  document.getElementById('modal-score-val').textContent = ev.score + ' / 100';
+  const bar = document.getElementById('modal-threat-bar');
+  const segs = 10;
+  const filled = Math.round(ev.score/10);
+  bar.innerHTML='';
+  for(let i=0;i<segs;i++){
+    const s=document.createElement('div');
+    s.className='modal-threat-seg';
+    if(i<filled){
+      const c = ev.score>=70?'var(--threat-high)':ev.score>=40?'var(--threat-med)':'var(--threat-low)';
+      s.style.background=c;
+      s.style.boxShadow=`0 0 4px ${c}`;
+    }
+    bar.appendChild(s);
+  }
+  document.getElementById('modal-source-val').textContent = ev.source;
+  document.getElementById('event-modal').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('event-modal').classList.remove('open');
+}
+document.getElementById('event-modal').addEventListener('click', e=>{
+  if(e.target===e.currentTarget) closeModal();
+});
+
+// ── STATS RENDERING ──
+function renderStats(events){
+  const exp   = events.filter(e=>e.type==='explosion').length;
+  const clash = events.filter(e=>e.type==='clash').length;
+  const tens  = events.filter(e=>e.type==='tension').length;
+  const max   = events.reduce((m,e)=>Math.max(m,e.score),0);
+  const avg   = events.length ? Math.round(events.reduce((s,e)=>s+e.score,0)/events.length) : 0;
+
+  document.getElementById('stat-events').textContent = events.length;
+  document.getElementById('stat-exp').textContent = exp;
+  document.getElementById('stat-clashes').textContent = clash;
+  document.getElementById('stat-tensions').textContent = tens;
+  document.getElementById('stat-max').textContent = max;
+  document.getElementById('stat-avg').textContent = avg;
+  document.getElementById('leg-exp').textContent = exp;
+  document.getElementById('leg-clash').textContent = clash;
+  document.getElementById('leg-tension').textContent = tens;
+  document.getElementById('feed-count-badge').textContent = events.length;
+
+  // Threat bar
+  const level = avg;
+  const segs = 10;
+  const filled = Math.round(level/10);
+  for(let i=0;i<10;i++){
+    const el=document.getElementById('tb'+i);
+    if(!el) continue;
+    el.className='tlb-seg';
+    if(i<filled){
+      if(level>=70) el.classList.add('active-high');
+      else if(level>=40) el.classList.add('active-med');
+      else el.classList.add('active-low');
+    }
+  }
+  const lbl=document.getElementById('threat-label');
+  if(level>=70){ lbl.textContent='CRITICAL'; lbl.style.color='var(--threat-high)'; }
+  else if(level>=50){ lbl.textContent='ELEVATED'; lbl.style.color='var(--threat-high)'; }
+  else if(level>=30){ lbl.textContent='MODERATE'; lbl.style.color='var(--threat-med)'; }
+  else { lbl.textContent='LOW'; lbl.style.color='var(--threat-low)'; }
+}
+
+function renderRegions(events){
+  const regionData = {};
+  events.forEach(e=>{
+    if(!regionData[e.region]) regionData[e.region]={count:0,score:0,types:{}};
+    regionData[e.region].count++;
+    regionData[e.region].score = Math.max(regionData[e.region].score, e.score);
+    regionData[e.region].types[e.type]=(regionData[e.region].types[e.type]||0)+1;
+  });
+  const sorted = Object.entries(regionData).sort((a,b)=>b[1].score-a[1].score);
+  document.getElementById('region-count-badge').textContent = sorted.length;
+  const list = document.getElementById('region-list');
+  list.innerHTML='';
+  sorted.forEach(([name,d])=>{
+    const color = d.score>=70?'var(--threat-high)':d.score>=40?'var(--threat-med)':'var(--threat-low)';
+    const el = document.createElement('div');
+    el.className='region-item';
+    el.innerHTML=`<div class="region-dot" style="background:${color};box-shadow:0 0 4px ${color};"></div>
+      <div class="region-info">
+        <div class="region-name">${name.substring(0,16)}</div>
+        <div class="region-count mono">${d.count} EVT</div>
+      </div>
+      <div class="region-score" style="color:${color};">${d.score}</div>`;
+    el.onclick=()=>{ focusRegion(name, events); };
+    list.appendChild(el);
+  });
+}
+
+function focusRegion(name, events){
+  const evs = events.filter(e=>e.region===name||e.region.includes(name.split(' ')[0]));
+  if(evs.length){
+    const lats=evs.map(e=>e.lat), lngs=evs.map(e=>e.lng);
+    const bounds=L.latLngBounds(evs.map(e=>[e.lat,e.lng]));
+    map.fitBounds(bounds,{padding:[40,40],maxZoom:7});
+  }
+}
+
+function renderFeed(events){
+  const feed = document.getElementById('feed');
+  feed.innerHTML='';
+  const sorted = [...events].sort((a,b)=>b.timestamp-a.timestamp||b.score-a.score);
+  sorted.forEach((ev,i)=>{
+    const el=document.createElement('div');
+    el.className='feed-item'+(i<3?' new':'');
+    const color = ev.score>=70?'var(--threat-high)':ev.score>=40?'var(--threat-med)':'var(--threat-low)';
+    const thumb = ev.img||getFallback(ev.type);
+    el.innerHTML=`
+      <img class="feed-thumb" src="${thumb}" alt="event"
+        onerror="imgError(this,'${ev.type}')">
+      <div class="feed-content">
+        <div class="feed-meta">
+          <div class="feed-type-badge type-${ev.type}">${ev.type.toUpperCase()}</div>
+          <div class="feed-score" style="color:${color};">${ev.score}</div>
+        </div>
+        <div class="feed-title">${ev.title}</div>
+        <div class="feed-footer">
+          <div class="feed-source">${ev.source}</div>
+          <div class="feed-time">${formatTimeShort(ev.timestamp)}</div>
+        </div>
+      </div>`;
+    el.onclick=()=>openModal(ev);
+    feed.appendChild(el);
+  });
+}
+
+function renderBarChart(events){
+  const chart=document.getElementById('bar-chart');
+  chart.innerHTML='';
+  const buckets=Array(12).fill(0);
+  const now=Date.now();
+  events.forEach(ev=>{
+    const hoursAgo=(now-ev.timestamp)/3600000;
+    const b=Math.min(11,Math.floor(hoursAgo));
+    buckets[11-b]++;
+  });
+  const maxB=Math.max(...buckets,1);
+  buckets.forEach((v,i)=>{
+    const el=document.createElement('div');
+    el.className='bar-seg';
+    el.setAttribute('data-val',v);
+    const pct=Math.max(5,Math.round((v/maxB)*100));
+    el.style.height=pct+'%';
+    const hue=i/11;
+    const c=hue>0.7?'var(--accent2)':hue>0.4?'var(--accent3)':'var(--accent)';
+    el.style.background=c;
+    el.style.opacity=0.6+0.4*(v/maxB);
+    chart.appendChild(el);
+  });
+}
+
+function renderTicker(events){
+  const sorted=[...events].sort((a,b)=>b.score-a.score).slice(0,8);
+  const items=sorted.map(e=>`<span class="ticker-item"><span>${e.type.toUpperCase()}</span> — ${e.title.substring(0,60)} — <span>SCORE:${e.score}</span> — ${e.region}</span>`);
+  const doubled=[...items,...items];
+  document.getElementById('ticker-track').innerHTML=doubled.join('&nbsp;&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;&nbsp;');
+}
+
+// ── RADAR CANVAS ──
+let radarAngle=0;
+function renderRadar(events){
+  const canvas=document.getElementById('radar-canvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  const cx=W/2, cy=H/2;
+  const r=Math.min(W,H)/2-4;
+  const isDark=document.documentElement.getAttribute('data-theme')!=='light';
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=isDark?'#050a0e':'#d0dae6';
+  ctx.fillRect(0,0,W,H);
+  const circles=[0.25,0.5,0.75,1.0];
+  circles.forEach(f=>{
+    ctx.beginPath(); ctx.arc(cx,cy,r*f,0,Math.PI*2);
+    ctx.strokeStyle=isDark?'rgba(0,200,255,0.15)':'rgba(0,80,160,0.15)';
+    ctx.lineWidth=1; ctx.stroke();
+  });
+  for(let a=0;a<Math.PI*2;a+=Math.PI/4){
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r*0.1, cy+Math.sin(a)*r*0.1);
+    ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+    ctx.strokeStyle=isDark?'rgba(0,200,255,0.1)':'rgba(0,80,160,0.1)';
+    ctx.lineWidth=1; ctx.stroke();
+  }
+  // sweep
+  const grad=ctx.createConicalGradient ? null : null;
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(radarAngle);
+  const sweepGrad=ctx.createLinearGradient(0,-r,0,r);
+  sweepGrad.addColorStop(0,isDark?'rgba(0,255,136,0)'     :'rgba(0,120,60,0)');
+  sweepGrad.addColorStop(0.5,isDark?'rgba(0,255,136,0.15)':'rgba(0,120,60,0.1)');
+  sweepGrad.addColorStop(1,isDark?'rgba(0,255,136,0.35)'  :'rgba(0,120,60,0.25)');
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.arc(0,0,r,-Math.PI*0.6,0);
+  ctx.closePath();
+  ctx.fillStyle=sweepGrad;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0,0); ctx.lineTo(r,0);
+  ctx.strokeStyle=isDark?'rgba(0,255,136,0.7)':'rgba(0,120,60,0.7)';
+  ctx.lineWidth=1.5; ctx.stroke();
+  ctx.restore();
+  // dots
+  const high=events.filter(e=>e.score>=70);
+  const med =events.filter(e=>e.score>=40&&e.score<70);
+  const low =events.filter(e=>e.score<40);
+  [[high,'#ff4444'],[med,'#ffaa00'],[low,'#00c8ff']].forEach(([arr,col])=>{
+    arr.slice(0,5).forEach((_,i)=>{
+      const angle=Math.random()*Math.PI*2;
+      const dist=(0.3+Math.random()*0.6)*r;
+      const dx=cx+Math.cos(angle)*dist;
+      const dy=cy+Math.sin(angle)*dist;
+      ctx.beginPath();
+      ctx.arc(dx,dy,2,0,Math.PI*2);
+      ctx.fillStyle=col;
+      ctx.fill();
+    });
+  });
+  radarAngle+=0.04;
+  requestAnimationFrame(()=>renderRadar(events));
+}
+
+// ── TIME HELPERS ──
+function formatTime(d){
+  if(!d) return '--';
+  return d.toISOString().replace('T',' ').substring(0,19)+' UTC';
+}
+function formatTimeShort(d){
+  if(!d) return '--';
+  const diff=Date.now()-d;
+  const h=Math.floor(diff/3600000);
+  const m=Math.floor((diff%3600000)/60000);
+  if(h>0) return h+'H '+m+'M AGO';
+  return m+'M AGO';
+}
+
+// ── CLOCK ──
+function updateClock(){
+  const now=new Date();
+  const h=String(now.getUTCHours()).padStart(2,'0');
+  const m=String(now.getUTCMinutes()).padStart(2,'0');
+  const s=String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent=h+':'+m+':'+s+' UTC';
+}
+setInterval(updateClock,1000);
+updateClock();
+
+// ── THEME ──
+function toggleTheme(){
+  const html=document.documentElement;
+  const isDark=html.getAttribute('data-theme')==='dark';
+  html.setAttribute('data-theme', isDark?'light':'dark');
+  document.getElementById('theme-btn').textContent=isDark?'◑ DARK':'☀ LIGHT';
+  if(map){
+    map.eachLayer(l=>{ if(l._url) map.removeLayer(l); });
+    const tileSrc=isDark?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png':'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    L.tileLayer(tileSrc,{subdomains:'abcd',maxZoom:19}).addTo(map);
+  }
+}
+
+// ── TIMELINE SLIDER ──
+document.getElementById('timeline-slider').addEventListener('input', e=>{
+  const val=parseInt(e.target.value);
+  if(val===100){ document.getElementById('tl-time-label').textContent='NOW'; }
+  else{
+    const hoursBack=Math.round((100-val)/100*24);
+    document.getElementById('tl-time-label').textContent='-'+hoursBack+'H';
+  }
+  const cutoffMs=Date.now()-(100-val)/100*24*3600000;
+  const filtered=allEvents.filter(ev=>ev.timestamp>=new Date(cutoffMs));
+  plotEvents(filtered);
+  renderStats(filtered);
+});
+
+// ── LOADING STEPS ──
+const loadSteps=['INITIALIZING SUBSYSTEMS...','CONNECTING TO GDELT API...','PARSING EVENT STREAM...','CLASSIFYING INCIDENTS...','PLOTTING COORDINATES...','RENDERING OVERLAYS...','SYSTEM READY'];
+let stepIdx=0;
+function advanceLoadStep(){
+  if(stepIdx<loadSteps.length){
+    document.getElementById('loading-step-text').textContent=loadSteps[stepIdx++];
+  }
+}
+const stepTimer=setInterval(()=>{
+  advanceLoadStep();
+  if(stepIdx>=loadSteps.length) clearInterval(stepTimer);
+},380);
+
+// ── MAIN INIT ──
+window.addEventListener('load', async()=>{
+  initMap();
+  renderRadar([]);
+  // Give loading screen time
+  await new Promise(r=>setTimeout(r,2600));
+  let events;
+  let usedFallback=false;
+  try{
+    events=await fetchGDELT();
+    if(!events||events.length<3) throw new Error('Insufficient data');
+  } catch(err){
+    console.warn('GDELT fetch failed, using mock data:', err.message);
+    events=makeMockEvents(18);
+    usedFallback=true;
+  }
+  allEvents=events;
+  // Render everything
+  plotEvents(events);
+  renderStats(events);
+  renderRegions(events);
+  renderFeed(events);
+  renderBarChart(events);
+  renderTicker(events);
+  if(usedFallback){
+    document.getElementById('data-source-label').textContent='MOCK';
+    document.getElementById('data-source-label').style.color='var(--accent3)';
+  }
+  // Hide loading
+  const ls=document.getElementById('loading-screen');
+  ls.style.transition='opacity 0.6s';
+  ls.style.opacity='0';
+  setTimeout(()=>ls.remove(),700);
+  // Auto-refresh every 5 min
+  setInterval(async()=>{
+    try{
+      const fresh=await fetchGDELT();
+      if(fresh&&fresh.length>=3){
+        allEvents=fresh;
+        plotEvents(fresh);
+        renderStats(fresh);
+        renderRegions(fresh);
+        renderFeed(fresh);
+        renderBarChart(fresh);
+        renderTicker(fresh);
+      }
+    } catch(e){ /* keep existing data */ }
+  }, 300000);
+});
+</script>
+</body>
+</html>
